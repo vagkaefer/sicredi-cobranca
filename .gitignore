@@ -9,3 +9,6 @@ composer.lock
 .vscode/
 .DS_Store
 .env
+
+# Material de referência do Sicredi (não redistribuir)
+*.pdf
