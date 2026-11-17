@@ -148,4 +148,17 @@ class BoletoRequestTest extends TestCase
         $this->expectExceptionMessage('codigo_acesso');
         Config::fromArray(['ambiente' => 'producao', 'api_key' => 'k', 'cooperativa' => '1', 'posto' => '1', 'codigo_beneficiario' => '1']);
     }
+
+    public function test_situacoes_do_boleto_consultado(): void
+    {
+        $situacao = fn(string $s) => \VagKaefer\SicrediCobranca\Data\Boleto::fromArray(['nossoNumero' => '1', 'situacao' => $s]);
+
+        // Valor real devolvido pela produção para boleto híbrido em aberto.
+        $this->assertTrue($situacao('EM CARTEIRA PIX')->emAberto());
+        $this->assertTrue($situacao('Em carteira')->emAberto());
+        $this->assertTrue($situacao('VENCIDO')->emAberto());
+        $this->assertTrue($situacao('LIQUIDADO PIX')->liquidado());
+        $this->assertTrue($situacao('Baixado por solicitação')->baixado());
+        $this->assertFalse($situacao('LIQUIDADO')->emAberto());
+    }
 }

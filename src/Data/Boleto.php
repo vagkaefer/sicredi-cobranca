@@ -70,9 +70,14 @@ final class Boleto
         return str_starts_with($this->situacaoNormalizada(), 'BAIXADO');
     }
 
+    /**
+     * Disponível para pagamento. Em produção o híbrido vem como "EM CARTEIRA PIX".
+     */
     public function emAberto(): bool
     {
-        return in_array($this->situacaoNormalizada(), ['EM CARTEIRA', 'VENCIDO'], true);
+        $situacao = $this->situacaoNormalizada();
+
+        return str_starts_with($situacao, 'EM CARTEIRA') || str_starts_with($situacao, 'VENCIDO');
     }
 
     public static function normalizar(string $situacao): string
