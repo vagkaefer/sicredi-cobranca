@@ -11,12 +11,17 @@
         "laravel"
     ],
     "license": "MIT",
+    "homepage": "https://github.com/vagkaefer/sicredi-cobranca",
     "authors": [
         {
             "name": "Vagner Kaefer",
             "email": "vagner@kaefer.eng.br"
         }
     ],
+    "support": {
+        "issues": "https://github.com/vagkaefer/sicredi-cobranca/issues",
+        "source": "https://github.com/vagkaefer/sicredi-cobranca"
+    },
     "require": {
         "php": ">=8.2",
         "ext-json": "*",

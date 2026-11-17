@@ -9,6 +9,9 @@ namespace VagKaefer\SicrediCobranca\Events;
  *
  * O Sicredi não assina as chamadas: antes de dar baixa financeira, reconsulte o boleto
  * com SicrediCobranca::consultarBoleto($evento->nossoNumero).
+ *
+ * @experimental O formato do evento não é documentado pelo Sicredi; os campos extraídos
+ *               (nossoNumero, evento, idTituloEmpresa) podem mudar numa versão menor.
  */
 class WebhookRecebido
 {

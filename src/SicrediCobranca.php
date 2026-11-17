@@ -242,7 +242,7 @@ class SicrediCobranca
     }
 
     // ---------------------------------------------------------------------
-    // Webhook (somente produção)
+    // Webhook (somente produção, experimental: o formato dos eventos não é documentado)
     // ---------------------------------------------------------------------
 
     /**

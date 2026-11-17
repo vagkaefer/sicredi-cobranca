@@ -1,8 +1,16 @@
 # Sicredi Cobrança para Laravel
 
+[![CI](https://github.com/vagkaefer/sicredi-cobranca/actions/workflows/ci.yml/badge.svg)](https://github.com/vagkaefer/sicredi-cobranca/actions/workflows/ci.yml)
+[![Packagist](https://img.shields.io/packagist/v/vagkaefer/sicredi-cobranca.svg)](https://packagist.org/packages/vagkaefer/sicredi-cobranca)
+[![Licença](https://img.shields.io/packagist/l/vagkaefer/sicredi-cobranca.svg)](LICENSE)
+
 Pacote Laravel para a [API de Cobrança do Sicredi](https://developers.sicredi.com.br/public/docs/getting-started-billing):
 registro de boleto e **boleto híbrido (boleto + Pix)**, PDF, consultas, conciliação de liquidados,
-comandos de instrução (baixa, vencimento, juros, desconto, abatimento) e webhook de liquidação.
+comandos de instrução (baixa, vencimento, juros, desconto, abatimento) e webhook de liquidação
+(experimental).
+
+Validado em produção: autenticação, boleto híbrido com multa/juros, PDF, consulta, baixa e
+conciliação de pagamentos via Pix.
 
 - Autenticação OAuth2 (password + refresh) com token em cache e lock contra corrida
 - Normaliza os campos nos limites da API (documento, CEP, nome com 40 caracteres, mensagens...)
@@ -90,6 +98,10 @@ Com `TipoCobranca::Normal`, as datas são enviadas normalmente.
 ### Configuração em tempo de execução
 
 ```php
+use VagKaefer\SicrediCobranca\Config;
+use VagKaefer\SicrediCobranca\Enums\Ambiente;
+use VagKaefer\SicrediCobranca\Facades\SicrediCobranca;
+
 // AppServiceProvider::boot(): ex. credenciais guardadas no banco
 app(\VagKaefer\SicrediCobranca\SicrediCobranca::class)
     ->resolverConfigUsing(fn () => [
@@ -116,7 +128,43 @@ SicrediCobranca::usando(new Config(Ambiente::Producao, $apiKey, $codigoAcesso, '
 Todas têm `$e->status` e `$e->corpo` (a resposta original). Um 401 em chamada da API renova o token
 e repete a chamada uma vez.
 
-## Webhook de liquidação (só produção)
+## Particularidades da produção
+
+O sandbox devolve dados fixos e não mostra estes comportamentos, observados em produção:
+
+- **PDF logo após o registro:** nos primeiros segundos depois de `criarBoleto()`, `pdf()` lança
+  `SicrediException` com **HTTP 406**: o PDF ainda não foi gerado. Baixe o PDF numa fila, com nova
+  tentativa:
+
+  ```php
+  class BaixarPdfDoBoleto implements ShouldQueue
+  {
+      public int $tries = 6;
+      public array $backoff = [30, 60, 120, 300, 900];
+
+      public function __construct(public string $linhaDigitavel) {}
+
+      public function handle(): void
+      {
+          Storage::put("boletos/{$this->linhaDigitavel}.pdf", SicrediCobranca::pdf($this->linhaDigitavel));
+      }
+  }
+  ```
+
+- **Situação em aberto do híbrido:** vem como `EM CARTEIRA PIX` (não só `EM CARTEIRA`). Use
+  `$consulta->emAberto()`, `liquidado()` e `baixado()`, que comparam pelo início e ignoram acentos.
+- **Hora do pagamento:** `liquidadosPorDia()` traz só a data (`2026-11-16 00:00:00`). A data e hora
+  exatas, com fuso (`2026-11-16T22:01:43-03:00`), vêm de `consultarBoleto($nossoNumero)->dataLiquidacao`.
+- **Baixa:** `baixar()` responde 202 com `statusComando` `MOVIMENTO_ENVIADO`; a situação passa para
+  `BAIXADO POR SOLICITACAO` em poucos segundos.
+- **Só existem em produção:** webhook, `cadastrados()` e a consulta v2.
+
+## Webhook de liquidação (experimental, só produção)
+
+> **Experimental.** O Sicredi não documenta o formato do evento enviado ao webhook e não assina as
+> chamadas, e esta parte ainda não foi validada com eventos reais de produção. Ela pode mudar numa
+> versão menor. Use o webhook só como aviso para reconsultar o boleto e mantenha uma conciliação
+> periódica com `liquidadosPorDia()` como fonte de verdade.
 
 ```dotenv
 SICREDI_WEBHOOK_ENABLED=true
@@ -141,11 +189,16 @@ Requisitos do endpoint: HTTPS com certificado válido (não autoassinado), TLS 1
 
 ## Como obter acesso
 
+Sandbox e produção usam **aplicações separadas** no Portal do Desenvolvedor, cada uma com sua
+`x-api-key`. Com mais de um código de beneficiário, cada um precisa do seu par de aplicações.
+
 ### Homologação (sandbox)
-1. Crie uma conta no [Portal do Desenvolvedor Sicredi](https://developers.sicredi.com.br) e uma
-   aplicação com as APIs **Cobrança** e **Autenticação de Parceiros**.
-2. Abra um chamado (Suporte → Abrir chamado) para liberar a `x-api-key` do sandbox. Ela aparece em
-   Minhas Apps → (app) → Ver detalhes.
+1. Crie uma conta profissional no [Portal do Desenvolvedor Sicredi](https://developer.sicredi.com.br)
+   e, em Minha Conta → Minhas Apps → Criar nova aplicação, uma app (ex.: `Api Cobrança <cooperativa>
+   <beneficiário> Sandbox`) com **API AUTH – OPENAPI – PARCEIROS** e **API COBRANÇA BOLETO**.
+2. Abra um chamado em Suporte → Abra um chamado: assunto "API Cobrança Boletos", motivo "Solicitar
+   Access Token", ambiente "Sandbox", informando o Client ID da app. Depois de resolvido, a
+   `x-api-key` aparece em Minhas Apps → (app) → Ver detalhes.
 3. Use os valores de teste: cooperativa `6789`, posto `03`, beneficiário `12345`, código de acesso `teste123`.
 
 O sandbox devolve dados fixos no PDF, na consulta e nos liquidados. Não tem webhook, nem consulta v2,
@@ -153,12 +206,19 @@ nem `/boletos/cadastrados`.
 
 ### Produção
 1. Com a cooperativa: contrate a Cobrança na modalidade **API** (isso gera o Código do Beneficiário),
-   assine o termo de adesão e, para Pix, peça a liberação da **modalidade híbrida** no Portal PJ.
-2. No Portal do Desenvolvedor, crie a aplicação de produção (Cobrança + Autenticação de Parceiros) e
-   abra um chamado para liberar a `x-api-key` de produção.
-3. No Internet Banking, com o perfil **Master** da conta do convênio: Cobrança → Código de Acesso → Gerar.
-4. Configure `SICREDI_AMBIENTE=producao` e as credenciais de produção.
-5. Registre o webhook, se for usar.
+   assine o termo de adesão e, para Pix, peça a liberação da **modalidade híbrida**.
+2. No Portal do Desenvolvedor, crie a app de produção (ex.: `Api Cobrança <cooperativa> <beneficiário>
+   Produção`) com as mesmas duas APIs e abra o mesmo chamado, com ambiente "Produção" e o Client ID da
+   app nova.
+3. No Internet Banking, com o perfil **Master** da conta do convênio: Cobrança → Código de Acesso →
+   Gerar. O menu só aparece depois que a modalidade API está habilitada.
+4. Cooperativa, posto e beneficiário estão em qualquer boleto da conta, no campo "Agência / Código do
+   Beneficiário", no formato `CCCC.PP.BBBBB`.
+5. Configure `SICREDI_AMBIENTE=producao` e as credenciais de produção. Com a sandbox `x-api-key` em
+   produção, a autenticação responde 403 "Access denied for this environment".
+
+Suporte do Sicredi: chamados no portal ou cobrancaonline@sicredi.com.br (sandbox); para produção e
+boletos já registrados, a central de Cobrança (3003-4770 / 0800-724-4770).
 
 ## Testes
 
@@ -167,6 +227,11 @@ composer test
 composer phpstan
 composer cs-check
 ```
+
+## Versionamento
+
+Segue [SemVer](https://semver.org/lang/pt-BR/). As mudanças de cada versão estão no
+[CHANGELOG](CHANGELOG.md). Partes marcadas como experimentais podem mudar em versões menores.
 
 ## Licença
 

@@ -16,6 +16,9 @@ use VagKaefer\SicrediCobranca\SicrediCobranca;
 /**
  * Recebe os eventos do webhook e só dispara WebhookRecebido.
  * O Sicredi exige resposta 200 em até 10s: processe o evento numa fila.
+ *
+ * @experimental O Sicredi não documenta o formato do evento e não assina as chamadas; esta parte
+ *               ainda não foi validada com eventos reais e pode mudar numa versão menor.
  */
 class WebhookController
 {
