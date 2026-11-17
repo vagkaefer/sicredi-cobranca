@@ -5,7 +5,7 @@ e o versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [1.0.0] - 2026-11-16
 
-Primeira versão pública, validada em produção.
+Primeira versão pública, validada em produção. Requer PHP 8.2+ e Laravel 12 ou 13.
 
 ### Adicionado
 - Autenticação OAuth2 (password + refresh_token), com o token em cache e lock contra autenticações paralelas.

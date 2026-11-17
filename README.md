@@ -17,7 +17,7 @@ conciliação de pagamentos via Pix.
 - Exceções tipadas por status HTTP
 - Configuração por `.env` **ou** em tempo de execução (ex.: credenciais guardadas no banco)
 
-Requer PHP 8.2+ e Laravel 11, 12 ou 13.
+Requer PHP 8.2+ e Laravel 12 ou 13 (Laravel 13 exige PHP 8.3+).
 
 ## Instalação
 
