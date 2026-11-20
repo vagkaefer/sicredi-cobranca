@@ -37,8 +37,15 @@ class PixWebhookController
             }
         }
 
-        $esperado = $this->tokenEsperado($pix, $config);
-        if ($esperado !== null && ! $this->tokenConfere($request, $config, $esperado)) {
+        [$esperado, $configFalhou] = $this->tokenEsperado($pix, $config);
+
+        if ($esperado === null) {
+            // Sem token conhecido, só aceita se o app desligou a exigência de propósito. Configuração
+            // com erro nunca abre o webhook: recusa e o PSP reenvia depois.
+            if ($configFalhou || (bool) $config->get(self::PREFIXO . 'exigir_token', true)) {
+                return new JsonResponse(['erro' => 'webhook Pix sem token configurado'], 503);
+            }
+        } elseif (! $this->tokenConfere($request, $config, $esperado)) {
             return new JsonResponse(['erro' => 'token inválido'], 401);
         }
 
@@ -72,18 +79,30 @@ class PixWebhookController
         return $recebido !== '' && hash_equals($esperado, $recebido);
     }
 
-    private function tokenEsperado(SicrediPix $pix, ConfigRepository $config): ?string
+    /**
+     * Ordem: resolver explícito (resolverWebhookTokenUsing), configuração do cliente Pix e arquivo
+     * de config. Devolve também se a leitura da configuração falhou.
+     *
+     * @return array{0: ?string, 1: bool}
+     */
+    private function tokenEsperado(SicrediPix $pix, ConfigRepository $config): array
     {
-        try {
-            $token = $pix->config()->webhookToken;
-        } catch (Throwable $e) {
-            // Configuração incompleta não pode derrubar o recebimento; cai no token do arquivo de config.
-            Log::warning('Sicredi Pix webhook: não foi possível ler a configuração: ' . $e->getMessage());
-            $token = null;
+        $token = $pix->webhookTokenExplicito();
+        $falhou = false;
+
+        if ($token === null) {
+            try {
+                $token = $pix->config()->webhookToken;
+            } catch (Throwable $e) {
+                Log::warning('Sicredi Pix webhook: não foi possível ler a configuração: ' . $e->getMessage());
+                $falhou = true;
+            }
         }
 
         $token ??= $config->get(self::PREFIXO . 'token');
+        $token = is_string($token) && trim($token) !== '' ? trim($token) : null;
 
-        return is_string($token) && $token !== '' ? $token : null;
+        // Com o token do arquivo de config disponível, a falha na configuração não impede a validação.
+        return [$token, $falhou && $token === null];
     }
 }

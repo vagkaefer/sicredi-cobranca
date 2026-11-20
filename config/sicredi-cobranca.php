@@ -100,6 +100,10 @@ return [
             'token' => env('SICREDI_PIX_WEBHOOK_TOKEN'),
             'header' => env('SICREDI_PIX_WEBHOOK_HEADER', 'X-Sicredi-Token'),
 
+            // Sem token configurado o webhook responde 503. Só desligue se outra camada (ex.: mTLS
+            // validado pelo proxy) garantir que as chamadas vêm do Sicredi.
+            'exigir_token' => (bool) env('SICREDI_PIX_WEBHOOK_EXIGIR_TOKEN', true),
+
             // Opcional: header preenchido pelo proxy após validar o certificado do Sicredi (mTLS),
             // ex.: X-SSL-Client-Verify com valor SUCCESS. Vazio = não verifica.
             'mtls_header' => env('SICREDI_PIX_WEBHOOK_MTLS_HEADER'),

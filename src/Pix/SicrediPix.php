@@ -39,6 +39,9 @@ class SicrediPix
     /** @var Closure(): PixConfig */
     private Closure $resolver;
 
+    /** @var (Closure(): ?string)|null */
+    private ?Closure $resolverTokenWebhook = null;
+
     /**
      * @param PixConfig|Closure(): PixConfig $config
      */
@@ -69,7 +72,35 @@ class SicrediPix
      */
     public function usando(PixConfig $config): self
     {
-        return new self($this->http, $this->cache, $config);
+        $cliente = new self($this->http, $this->cache, $config);
+        $cliente->resolverTokenWebhook = $this->resolverTokenWebhook;
+
+        return $cliente;
+    }
+
+    /**
+     * Define de onde vem o token exigido no webhook (ex.: banco de dados), sem depender da leitura
+     * do certificado: o recebimento continua protegido mesmo com a configuração mTLS incompleta.
+     *
+     * @param Closure(): ?string $resolver
+     */
+    public function resolverWebhookTokenUsing(Closure $resolver): void
+    {
+        $this->resolverTokenWebhook = $resolver;
+    }
+
+    /**
+     * Token do webhook vindo do resolver explícito; null quando não há resolver ou ele não devolve nada.
+     */
+    public function webhookTokenExplicito(): ?string
+    {
+        if ($this->resolverTokenWebhook === null) {
+            return null;
+        }
+
+        $token = trim((string) ($this->resolverTokenWebhook)());
+
+        return $token === '' ? null : $token;
     }
 
     public function config(): PixConfig

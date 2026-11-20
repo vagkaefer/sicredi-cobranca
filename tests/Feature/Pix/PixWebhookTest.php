@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace VagKaefer\SicrediCobranca\Tests\Feature\Pix;
 
 use Illuminate\Support\Facades\Event;
+use RuntimeException;
 use VagKaefer\SicrediCobranca\Events\PixRecebido;
 use VagKaefer\SicrediCobranca\Events\WebhookRecebido;
+use VagKaefer\SicrediCobranca\Pix\SicrediPix;
 use VagKaefer\SicrediCobranca\Tests\TestCase;
 
 class PixWebhookTest extends TestCase
@@ -96,6 +98,58 @@ class PixWebhookTest extends TestCase
         $this->postJson('/sicredi/pix/webhook/pix?token=segredo-pix', self::lote(1))->assertStatus(403);
         $this->postJson('/sicredi/pix/webhook/pix?token=segredo-pix', self::lote(1), ['X-SSL-Client-Verify' => 'FAILED:unable to verify'])->assertStatus(403);
         $this->postJson('/sicredi/pix/webhook/pix?token=segredo-pix', self::lote(1), ['X-SSL-Client-Verify' => 'SUCCESS'])->assertOk();
+
+        Event::assertDispatchedTimes(PixRecebido::class, 1);
+    }
+
+    public function test_configuracao_quebrada_sem_token_no_arquivo_recusa_em_vez_de_abrir(): void
+    {
+        config()->set('sicredi-cobranca.pix.webhook.token', null);
+        app(SicrediPix::class)->resolverConfigUsing(fn() => throw new RuntimeException('certificado ausente'));
+        Event::fake();
+
+        $this->postJson('/sicredi/pix/webhook/pix', self::lote(1))->assertStatus(503);
+        $this->postJson('/sicredi/pix/webhook/pix?token=qualquer', self::lote(1))->assertStatus(503);
+
+        Event::assertNotDispatched(PixRecebido::class);
+    }
+
+    public function test_configuracao_quebrada_ainda_valida_o_token_do_arquivo(): void
+    {
+        app(SicrediPix::class)->resolverConfigUsing(fn() => throw new RuntimeException('certificado ausente'));
+        Event::fake();
+
+        $this->postJson('/sicredi/pix/webhook/pix', self::lote(1))->assertStatus(401);
+        $this->postJson('/sicredi/pix/webhook/pix?token=segredo-pix', self::lote(1))->assertOk();
+
+        Event::assertDispatchedTimes(PixRecebido::class, 1);
+    }
+
+    public function test_sem_token_configurado_recusa_a_menos_que_a_exigencia_seja_desligada(): void
+    {
+        config()->set('sicredi-cobranca.pix.webhook.token', null);
+        app(SicrediPix::class)->resolverConfigUsing(fn() => array_merge(self::pixConfig(), ['webhook_token' => null, 'webhook' => []]));
+        Event::fake();
+
+        $this->postJson('/sicredi/pix/webhook/pix', self::lote(1))->assertStatus(503);
+
+        config()->set('sicredi-cobranca.pix.webhook.exigir_token', false);
+        $this->postJson('/sicredi/pix/webhook/pix', self::lote(1))->assertOk();
+
+        Event::assertDispatchedTimes(PixRecebido::class, 1);
+    }
+
+    public function test_token_por_resolver_explicito_nao_depende_do_certificado(): void
+    {
+        config()->set('sicredi-cobranca.pix.webhook.token', null);
+        $pix = app(SicrediPix::class);
+        $pix->resolverConfigUsing(fn() => throw new RuntimeException('certificado ausente'));
+        $pix->resolverWebhookTokenUsing(fn() => 'token-do-banco');
+        Event::fake();
+
+        $this->postJson('/sicredi/pix/webhook/pix?token=segredo-pix', self::lote(1))->assertStatus(401);
+        $this->postJson('/sicredi/pix/webhook/pix?token=token-do-banco', self::lote(1))->assertOk();
+        $this->assertSame('token-do-banco', $pix->usando(\VagKaefer\SicrediCobranca\Pix\PixConfig::fromArray(self::pixConfig()))->webhookTokenExplicito());
 
         Event::assertDispatchedTimes(PixRecebido::class, 1);
     }

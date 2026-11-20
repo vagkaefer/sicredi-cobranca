@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace VagKaefer\SicrediCobranca\Tests\Feature;
 
 use Illuminate\Support\Facades\Event;
+use RuntimeException;
 use VagKaefer\SicrediCobranca\Events\WebhookRecebido;
+use VagKaefer\SicrediCobranca\SicrediCobranca;
 use VagKaefer\SicrediCobranca\Tests\TestCase;
 
 class WebhookTest extends TestCase
@@ -34,5 +36,27 @@ class WebhookTest extends TestCase
 
         Event::assertDispatched(WebhookRecebido::class, fn(WebhookRecebido $e) => $e->nossoNumero === '211001292' && $e->evento === 'LIQUIDACAO_PIX' && $e->idTituloEmpresa === 'CG7');
         Event::assertDispatchedTimes(WebhookRecebido::class, 3);
+    }
+
+    public function test_configuracao_quebrada_sem_token_no_arquivo_recusa(): void
+    {
+        config()->set('sicredi-cobranca.webhook.token', null);
+        app(SicrediCobranca::class)->resolverConfigUsing(fn() => throw new RuntimeException('credenciais ausentes'));
+        Event::fake();
+
+        $this->postJson('/sicredi/webhook', ['nossoNumero' => '1'])->assertStatus(503);
+
+        Event::assertNotDispatched(WebhookRecebido::class);
+    }
+
+    public function test_configuracao_quebrada_ainda_valida_o_token_do_arquivo(): void
+    {
+        app(SicrediCobranca::class)->resolverConfigUsing(fn() => throw new RuntimeException('credenciais ausentes'));
+        Event::fake();
+
+        $this->postJson('/sicredi/webhook', ['nossoNumero' => '1'])->assertStatus(401);
+        $this->postJson('/sicredi/webhook?token=segredo', ['nossoNumero' => '1'])->assertOk();
+
+        Event::assertDispatchedTimes(WebhookRecebido::class, 1);
     }
 }

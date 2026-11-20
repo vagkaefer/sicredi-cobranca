@@ -341,6 +341,16 @@ Event::listen(\VagKaefer\SicrediCobranca\Events\PixRecebido::class, function ($e
   Responde 200 mesmo sem itens (ex.: teste de alcance ao configurar o webhook).
 - O token é exigido no header `X-Sicredi-Token` ou em `?token=`. Se o PSP só concatenar `/pix` no fim
   da URL registrada, o token chega como `um-segredo-longo/pix`; isso também é aceito.
+- **Sem token configurado, o webhook responde 503** e não processa nada. Isso também vale quando a
+  configuração Pix está com erro (ex.: certificado ausente) e não há token no arquivo de config. Só
+  desligue a exigência (`SICREDI_PIX_WEBHOOK_EXIGIR_TOKEN=false`) se o mTLS validado pelo proxy
+  garantir a origem das chamadas.
+- Para guardar o token fora do `.env` (ex.: no banco), sem depender da leitura do certificado:
+
+  ```php
+  app(\VagKaefer\SicrediCobranca\Pix\SicrediPix::class)
+      ->resolverWebhookTokenUsing(fn () => setting('sicredi.pix.webhook_token'));
+  ```
 - **mTLS:** o Sicredi chama o webhook com certificado de cliente, que deve ser validado no servidor
   web, não no PHP. A CA usada pelo Sicredi ainda está **a confirmar**. Com o proxy validando, ative a
   conferência do header que ele repassa:

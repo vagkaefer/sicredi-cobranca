@@ -24,7 +24,12 @@ class WebhookController
 {
     public function __invoke(Request $request, SicrediCobranca $sicredi, Dispatcher $eventos, ConfigRepository $config): JsonResponse
     {
-        $esperado = $this->tokenEsperado($sicredi, $config);
+        [$esperado, $configFalhou] = $this->tokenEsperado($sicredi, $config);
+
+        // Configuração com erro e nenhum token no arquivo de config: nunca abre o webhook.
+        if ($configFalhou) {
+            return new JsonResponse(['erro' => 'webhook sem configuração válida'], 503);
+        }
 
         if ($esperado !== null) {
             $header = (string) $config->get('sicredi-cobranca.webhook.header', 'X-Sicredi-Token');
@@ -57,19 +62,25 @@ class WebhookController
         return new JsonResponse(['ok' => true]);
     }
 
-    private function tokenEsperado(SicrediCobranca $sicredi, ConfigRepository $config): ?string
+    /**
+     * @return array{0: ?string, 1: bool} token esperado e se a leitura da configuração falhou sem alternativa
+     */
+    private function tokenEsperado(SicrediCobranca $sicredi, ConfigRepository $config): array
     {
+        $falhou = false;
+
         try {
             $token = $sicredi->config()->webhookToken;
         } catch (Throwable $e) {
-            // Configuração incompleta não pode derrubar o recebimento; cai no token do arquivo de config.
             Log::warning('Sicredi webhook: não foi possível ler a configuração: ' . $e->getMessage());
             $token = null;
+            $falhou = true;
         }
 
         $token ??= $config->get('sicredi-cobranca.webhook.token');
+        $token = is_string($token) && $token !== '' ? $token : null;
 
-        return is_string($token) && $token !== '' ? $token : null;
+        return [$token, $falhou && $token === null];
     }
 
     /**
