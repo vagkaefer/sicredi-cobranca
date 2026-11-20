@@ -1,11 +1,13 @@
 {
     "name": "vagkaefer/sicredi-cobranca",
-    "description": "Pacote Laravel para a API de Cobrança do Sicredi: boleto, boleto híbrido com Pix, consultas, comandos de instrução e webhook de liquidação",
+    "description": "Pacote Laravel para as APIs do Sicredi: Cobrança (boleto, boleto híbrido com Pix, consultas, comandos de instrução, webhook de liquidação) e Pix (cobrança imediata, experimental)",
     "type": "library",
     "keywords": [
         "sicredi",
         "boleto",
         "pix",
+        "api pix",
+        "cobranca imediata",
         "boleto hibrido",
         "cobranca",
         "laravel"
@@ -52,7 +54,8 @@
                 "VagKaefer\\SicrediCobranca\\SicrediCobrancaServiceProvider"
             ],
             "aliases": {
-                "SicrediCobranca": "VagKaefer\\SicrediCobranca\\Facades\\SicrediCobranca"
+                "SicrediCobranca": "VagKaefer\\SicrediCobranca\\Facades\\SicrediCobranca",
+                "SicrediPix": "VagKaefer\\SicrediCobranca\\Facades\\SicrediPix"
             }
         }
     },

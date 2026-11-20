@@ -45,4 +45,65 @@ return [
         'token' => env('SICREDI_WEBHOOK_TOKEN'),
         'header' => env('SICREDI_WEBHOOK_HEADER', 'X-Sicredi-Token'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Pix (cobrança imediata) — experimental
+    |--------------------------------------------------------------------------
+    | Produto separado da Cobrança, com credenciais próprias (Client ID/Secret) e mTLS em todas as
+    | chamadas. Veja a seção "Pix (cobrança imediata)" do README.
+    */
+    'pix' => [
+        // "homologacao" ou "producao".
+        'ambiente' => env('SICREDI_PIX_AMBIENTE', 'homologacao'),
+
+        // URLs da API e do token. Em produção o padrão é https://api-pix.sicredi.com.br/api/v2 e
+        // https://api-pix.sicredi.com.br/oauth/token. Em homologação são OBRIGATÓRIAS: o host não é
+        // público e é informado pelo Sicredi ao liberar o acesso.
+        'base_url' => env('SICREDI_PIX_BASE_URL'),
+        'token_url' => env('SICREDI_PIX_TOKEN_URL'),
+
+        // Credenciais geradas no Portal do Desenvolvedor para a aplicação da API Pix.
+        'client_id' => env('SICREDI_PIX_CLIENT_ID'),
+        'client_secret' => env('SICREDI_PIX_CLIENT_SECRET'),
+
+        // mTLS: certificado assinado pelo Sicredi e a chave privada do CSR, ambos em PEM.
+        // Aceita o caminho do arquivo ou o próprio conteúdo PEM (gravado em arquivo temporário 600).
+        'certificado' => env('SICREDI_PIX_CERTIFICADO'),
+        'certificado_senha' => env('SICREDI_PIX_CERTIFICADO_SENHA'),
+        'chave' => env('SICREDI_PIX_CHAVE'),
+        'chave_senha' => env('SICREDI_PIX_CHAVE_SENHA'),
+
+        // Diretório dos arquivos temporários de certificado/chave (null = sys_get_temp_dir()/sicredi-pix).
+        'diretorio_temporario' => env('SICREDI_PIX_DIRETORIO_TEMPORARIO'),
+
+        // Chave Pix do recebedor (CNPJ, e-mail, telefone ou aleatória), usada nas cobranças e no webhook.
+        'chave_pix' => env('SICREDI_PIX_CHAVE_PIX'),
+
+        // Escopos pedidos no token, separados por espaço. A devolução usa pix.write (referência
+        // OpenAPI); o guia do Sicredi cita pix.read. Se o token falhar por escopo, ajuste aqui.
+        'escopos' => env('SICREDI_PIX_ESCOPOS', 'cob.write cob.read pix.read pix.write webhook.read webhook.write'),
+
+        'timeout' => (int) env('SICREDI_PIX_TIMEOUT', 30),
+        'connect_timeout' => (int) env('SICREDI_PIX_CONNECT_TIMEOUT', 10),
+
+        // Store de cache usado para guardar o token (null = store padrão).
+        'cache_store' => env('SICREDI_PIX_CACHE_STORE'),
+
+        'webhook' => [
+            // Registra as rotas POST {path} e {path}/pix que recebem os Pix.
+            'enabled' => (bool) env('SICREDI_PIX_WEBHOOK_ENABLED', false),
+            'path' => env('SICREDI_PIX_WEBHOOK_PATH', 'sicredi/pix/webhook'),
+            'middleware' => ['api'],
+
+            // Segredo exigido em cada chamada, no header abaixo ou no parâmetro ?token= da URL.
+            'token' => env('SICREDI_PIX_WEBHOOK_TOKEN'),
+            'header' => env('SICREDI_PIX_WEBHOOK_HEADER', 'X-Sicredi-Token'),
+
+            // Opcional: header preenchido pelo proxy após validar o certificado do Sicredi (mTLS),
+            // ex.: X-SSL-Client-Verify com valor SUCCESS. Vazio = não verifica.
+            'mtls_header' => env('SICREDI_PIX_WEBHOOK_MTLS_HEADER'),
+            'mtls_valor' => env('SICREDI_PIX_WEBHOOK_MTLS_VALOR', 'SUCCESS'),
+        ],
+    ],
 ];
