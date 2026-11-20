@@ -5,6 +5,12 @@ e o versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-20
+
+### Segurança
+- Webhook da Cobrança: quando a configuração não pode ser lida e não há token no arquivo de config,
+  responde 503 em vez de aceitar a chamada sem token.
+
 ### Experimental
 - Módulo Pix (cobrança imediata) para a API Pix do Sicredi, no padrão da API Pix do Banco Central.
   Construído pela documentação e testado só com respostas simuladas: fica experimental até a validação
@@ -22,7 +28,9 @@ e o versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
   - Erros RFC 7807 em `PixException` e subclasses por status, com `correlationId` (também na
     mensagem) e `violacoes`.
   - Webhook nas rotas `{path}` e `{path}/pix`, com token, verificação opcional de mTLS feita pelo
-    proxy e o evento `PixRecebido` por item do lote.
+    proxy e o evento `PixRecebido` por item do lote. Sem token configurado (ou com a configuração
+    com erro) responde 503; a exigência só cai com `webhook.exigir_token=false`. O token pode vir de
+    `resolverWebhookTokenUsing()`, sem depender do certificado.
   - Escopo da devolução: `pix.write` por padrão (referência OpenAPI); o guia cita `pix.read`.
 
 ## [1.0.0] - 2026-11-16
@@ -48,5 +56,6 @@ Primeira versão pública, validada em produção. Requer PHP 8.2+ e Laravel 12 
   dispara `WebhookRecebido`. O formato do evento não é documentado pelo Sicredi e ainda não foi validado
   com eventos reais, então pode mudar numa versão menor.
 
-[Unreleased]: https://github.com/vagkaefer/sicredi-cobranca/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/vagkaefer/sicredi-cobranca/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/vagkaefer/sicredi-cobranca/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/vagkaefer/sicredi-cobranca/releases/tag/v1.0.0
